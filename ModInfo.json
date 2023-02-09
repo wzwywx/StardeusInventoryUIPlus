@@ -1,0 +1,11 @@
+{
+    "Id": "Searchable Inventory",
+    "SteamWorkshop": true,
+    "Name": "Searchable Inventory",
+    "Description": "For troubleshooting",
+    "ModVersion": "1.0.0",
+    "GameVersion": "0.7.2.1490",
+    "Dependencies": [
+        "Core"
+    ]
+}
