@@ -10,7 +10,8 @@ using KL.Collections;
 using System.Linq;
 using Game.Components;
 using Game;
-// using ExampleMod.Systems;
+using Game.Rendering;
+using UnityEngine;
 
 namespace SearchableInventory
 {
@@ -31,7 +32,7 @@ namespace SearchableInventory
         public Entity Entity => null;
         private UDB header;
 
-        private void DoSomethig()
+        private void DoSomething()
         {
             // For this example, let's increment the number and rebuild the UI
             sys.SomeVariable++;
@@ -70,76 +71,8 @@ namespace SearchableInventory
             return null;
         }
 
-        // private UDB sortModeBlock;
-
-        // private S.Sys.Inventory.SortMode sortMode;
-
-        // private System.Action ToggleSort()
-        // {
-        //     // S.Sys.Inventory.
-        //     // sortMode = KL.Utils.Enums.Cycle(sortMode);
-        //     return S.Sig.ShowCenterPanel.Send(this);
-        // }
-
         private readonly List<IMatStorage> materialStorages = new List<IMatStorage>();
         private readonly Dictionary<MatType, int> availableCache = new Dictionary<MatType, int>();
-
-        // Pass the cache to load remaining materials in the cache i.e. clear and fill back the materials
-        // public void LoadRemainingMaterials(Dictionary<MatType, int> remainingMaterials)
-        // {
-        //     remainingMaterials.Clear();
-        //     int count = materialStorages.Count;
-        //     D.Warn($"{count} storages");
-
-        //     foreach (MatType knownMaterial in S.Sys.Inventory.KnownMaterials)
-        //     {
-        //         remainingMaterials.Add(knownMaterial, 0);
-        //     }
-        //     for (int i = 0; i < count; i++)
-        //     {
-        //         IMatStorage matStorage = materialStorages[i];
-        //         if (matStorage is UnstoredMatComp unstoredMatComp)
-        //         {
-        //             MatType type = unstoredMatComp.Type;
-        //             if (type != null)
-        //             {
-        //                 if (remainingMaterials.TryGetValue(type, out var value))
-        //                 {
-        //                     remainingMaterials[type] = value + unstoredMatComp.Available(type);
-        //                 }
-        //                 else
-        //                 {
-        //                     remainingMaterials.Add(type, unstoredMatComp.Available(type));
-        //                 }
-        //             }
-        //         }
-        //         else
-        //         {
-        //             if (matStorage.Contents == null)
-        //             {
-        //                 continue;
-        //             }
-        //             foreach (KeyValuePair<MatType, int> content in matStorage.Contents)
-        //             {
-        //                 int value2 = content.Value;
-        //                 MatType key = content.Key;
-        //                 int value3;
-        //                 if (key == null)
-        //                 {
-        //                     D.Err("Invalid material: {0} in {1}", value2, matStorage.Entity);
-        //                 }
-        //                 else if (remainingMaterials.TryGetValue(key, out value3))
-        //                 {
-        //                     remainingMaterials[key] = value3 + value2;
-        //                 }
-        //                 else
-        //                 {
-        //                     remainingMaterials.Add(key, value2);
-        //                 }
-        //             }
-        //         }
-        //     }
-        // }
         void ToggleSort()
         {
             sortMode = Enums.Cycle(sortMode);
@@ -173,6 +106,109 @@ namespace SearchableInventory
             }
         }
 
+        private static bool isEquipmentLoaded = false;
+
+        private static readonly Dictionary<string, TempDef> AllEquipment = new Dictionary<string, TempDef>();
+
+        struct TempDef
+        {
+            public string Id;
+            public string DefId;
+            public bool IsExperimental;
+
+        }
+
+        // TODO: Just realized that I don't need this
+        private static void LoadKnownEquipment()
+        {
+            if (isEquipmentLoaded)
+            {
+                return;
+            }
+            isEquipmentLoaded = true;
+            string configParent = "Config/Equipment";
+            foreach (TempDef item in The.ModLoader.LoadObjects<TempDef>(configParent))
+            {
+                if (item.IsExperimental && !A.IsExperimentalOn)
+                {
+                    continue;
+                }
+                if (AllEquipment.ContainsKey(item.Id))
+                {
+                    string text = "Trying to load Equipment with Id that already exists: " + item.Id;
+                    D.Err(text);
+                    UIPopupWidget.Spawn("Icons/Color/Warning", "GAME BREAKING BUG", text);
+                    continue;
+                }
+                AllEquipment.Add(item.DefId, item);
+            }
+
+        }
+        // need to change this to return a category
+        private void Categorize(MatType mat, out string compType)
+        {
+            Def def = The.Defs.TryGet(mat.DefId);
+
+            // check processable
+            if (def.HasComponent(T.Processable))
+            {
+                foreach (ComponentConfig component in def.Components)
+                {
+                    if (component.ToString() == "CompCfg[Processable]")
+                    {
+                        var properties = component.Properties;
+                        if (properties is null)
+                        {
+                            D.Warn("No properties");
+                            continue;
+                        }
+                        foreach (var p in properties)
+                        {
+                            if (p.Key == "Type")
+                            {
+                                compType = p.String;
+                                return;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // // check equipment
+            // LoadKnownEquipment();
+            // // D.Warn("{0}", AllEquipment.Count);
+            // // foreach (var eq in AllEquipment)
+            // // {
+            // //     D.Warn(mat.DefId);
+            // //     D.Warn(eq.Key);
+            // //     D.Warn("---");
+            // // }
+            // if (AllEquipment.ContainsKey(mat.DefId))
+            // {
+            //     D.Warn("{0} is an equipment", mat.DefId);
+            // }
+
+            compType = mat.Group;
+
+            if (mat.Group is not null)
+            {
+                return;
+            }
+
+            if (Craftable.IsCraftable(def.Id))
+            {
+                // TODO: make this a local string later
+                compType = "Crafting/Building";
+                return;
+            }
+
+            // if fail to categorize at the end, give the "Unknown" category to material
+            if (mat.Group is null)
+            {
+                compType = "Unknown";
+                return;
+            }
+        }
         private UDB sortModeBlock;
 
         public void GetUIDetails(List<UDB> res)
@@ -190,12 +226,9 @@ namespace SearchableInventory
             {
                 sortModeBlock = UDB.Create(this, UDBT.DTextBtn, "Icons/White/Priority", T.Sort).WithText2(T.Toggle).WithClickFunction(ToggleSort).WithText2(T.Toggle).WithClickFunction(ToggleSort);
             }
-            // sortModeBlock = UDB.Create(this, UDBT.DTextBtn, "Icons/White/Priority", T.Sort).WithText2(T.Toggle).WithClickFunction(ToggleSort);
             sortModeBlock.UpdateText(sortText);
 
             res.Add(sortModeBlock);
-
-            // var materials = S.Sys.Inventory.KnownMaterials;
 
             IOrderedEnumerable<KeyValuePair<MatType, int>> orderedEnumerable = null;
 
@@ -213,60 +246,10 @@ namespace SearchableInventory
                 case SortMode.Category:
                     orderedEnumerable = availableCache.OrderBy((KeyValuePair<MatType, int> m) =>
                     {
-                        // D.Log($"{m.Key.DefId} is checked for grindability");
                         Def def = The.Defs.TryGet(m.Key.DefId);
-                        // D.Warn($"{def}");
-                        // D.Warn($"{def.Id} is {def.HasComponent(T.Processable)} processable");
-                        if (def.HasComponent(T.Processable))
-                        {
-                            foreach (ComponentConfig component in def.Components)
-                            {
-                                if (component.ToString() == "CompCfg[Processable]")
-                                {
-                                    var properties = component.Properties;
-                                    if (properties is null)
-                                    {
-                                        D.Warn("No properties");
-                                        continue;
-                                    }
-                                    foreach (var p in properties)
-                                    {
-                                        if (p.Key == "Type")
-                                        {
-                                            D.Warn(def.Id);
-                                            // D.Warn(component.ToString());
-                                            // D.Warn(m.Key.Group);
-                                            // D.Warn(p.ToString());
-                                            D.Warn($"{p.String}");
-                                            return p.String;
-
-                                            // D.Warn(p.StringSet[0]);
-                                            // D.Warn(p.StringSet[1]);
-
-                                        }
-                                    }
-                                }
-
-                                // if (property is null)
-                                // {
-                                //     D.Warn("No property");
-                                //     continue;
-                                // }
-
-                                // foreach (var p in property)
-                                // {
-
-                                //     D.Warn($"{p}");
-                                // }
-
-
-
-                            }
-                            // D.Warn($"{m.Key.DefId} is grindable");
-                        }
-
-                        // Alternate sorting: sort by material state i.e. solid, liquid, etc
-                        return m.Key.Group;
+                        string category;
+                        Categorize(m.Key, out category);
+                        return category;
                     });
                     break;
 
@@ -275,40 +258,13 @@ namespace SearchableInventory
             String category = "None";
             foreach (KeyValuePair<MatType, int> mat in orderedEnumerable)
             {
-                // DEBUG
-                // D.Warn($"{mat.Key.Id} {mat.GetType()} property {mat.Key.Property} group {mat.Key.Group} hgroup {mat.Key.HGroup}");
-                D.Warn(mat.Key.ProcessableDefId);
-
                 var def = The.Defs.TryGet(mat.Key.DefId);
+                Categorize(mat.Key, out category);
 
-                if (def.HasComponent(T.Processable))
-                {
-                    foreach (ComponentConfig component in def.Components)
-                    {
-                        if (component.ToString() == "CompCfg[Processable]")
-                        {
-                            var properties = component.Properties;
-                            if (properties is null)
-                            {
-                                continue;
-                            }
-                            foreach (var p in properties)
-                            {
-                                if (p.Key == "Type")
-                                {
-                                    category = p.String;
-                                }
-                            }
-                        }
-                    }
-
-                }
-                else
-                {
-                    category = mat.Key.Group;
-                }
                 res.Add(UDB.Create(this, UDBT.DLabel, "Icons/Color/Warning", $"{category}"));
-                UDB uDB = blocks.Get(mat.Key, null);
+
+                UDB uDB = blocks.GetValueOrDefault(mat.Key, null);
+
                 if (uDB == null)
                 {
                     uDB = UDB.Create(this, UDBT.ITextBtn, mat.Key.IconId, mat.Key.NameT).WithIconTint(mat.Key.IconTint).WithTooltipFunction((UDB b) => mat.Key.Def.ExtendedTooltip(S))
@@ -321,8 +277,8 @@ namespace SearchableInventory
                 {
                     if (s)
                     {
-                        // chartMat = mat.Key;
-                        // chartUDB.UpdateTitle(mat.Key.NameT);
+                        chartMat = mat.Key;
+                        chartUDB.UpdateTitle(mat.Key.NameT);
                     }
                 });
                 uDB.WithClickFunction(delegate
@@ -343,112 +299,77 @@ namespace SearchableInventory
                 });
                 res.Add(uDB);
             }
-            // the chart is private
-            // maybe I need to make my own
-            // CreateChart(res);
-            // S.Sys.Inventory.
-            // foreach (var mat in materials)
-            // {
-            //     // obsolete but I'm going to stick with what I see in the decompiler
-            //     UDB uDB = blocks.Get(mat, null);
-            //     D.Warn(mat.Id);
-            // }
+            CreateChart(res);
+        }
 
-            // D.Warn("{}{}", "Get sort mode block", sortModeBlock.Id);
-            // // if (sortModeBlock == null)
-            // // {
-            // //     sortModeBlock = UDB.Create(this, UDBT.DTextBtn, "Icons/White/Priority", T.Sort).WithText2(T.Toggle).WithClickFunction(ToggleSort);
-            // // }
-            // res.Add(UDB.Create(this, UDBT.IText, IconId.CInfo, "some.info".T())
-            //     .WithIconClickFunction(DoSomethig)
-            //     // Never do someNumber.ToString(), always use Units.XNum or Units.Num
-            //     // that way there will be no garbage
-            //     .WithText(Units.XNum(sys.SomeVariable)));
+        private UDB chartUDB;
+        private MatType chartMat;
 
-            // // Just like above, but with an extra button
-            // res.Add(UDB.Create(this, UDBT.ITextBtn, IconId.CInfo, "other.info".T())
-            //     .WithTooltip("tooltips.are.great".T())
-            //     // This would be the text on the right side, near  the button,
-            //     // but it's optional
-            //     //.WithText(null)
-            //     // Button text goes here
-            //     .WithText2(T.Execute)
-            //     .WithClickFunction(OnButtonClick));
-
-            // copying InventorySys
-
-            // S.Sys.Inventory
-
-
-            // if (sortModeBlock == null)
-            // {
-            //     sortModeBlock = UDB.Create(this, UDBT.DTextBtn, "Icons/White/Priority", T.Sort).WithText2(T.Toggle).WithClickFunction(ToggleSort);
-            // }
-            // sortModeBlock.UpdateText(sortText);
-            // res.Add(sortModeBlock);
-            // LoadRemainingMaterials(availableCache);
-            // if (availableCache.Count == 0 && blocks.Count == 0)
-            // {
-            //     res.Add(UDB.Create(this, UDBT.DText, "Icons/Color/Warning", T.AvailableMaterialsNone));
-            // }
-            // foreach (KeyValuePair<MatType, UDB> block in blocks)
-            // {
-            //     if (!availableCache.ContainsKey(block.Key))
-            //     {
-            //         block.Value.WithText("0");
-            //     }
-            // }
-            // IOrderedEnumerable<KeyValuePair<MatType, int>> orderedEnumerable = null;
-            // switch (sortMode)
-            // {
-            //     case SortMode.CountsDesc:
-            //         orderedEnumerable = availableCache.OrderByDescending((KeyValuePair<MatType, int> m) => m.Value);
-            //         break;
-            //     case SortMode.CountsAsc:
-            //         orderedEnumerable = availableCache.OrderBy((KeyValuePair<MatType, int> m) => m.Value);
-            //         break;
-            //     case SortMode.Alphabetic:
-            //         orderedEnumerable = availableCache.OrderBy((KeyValuePair<MatType, int> m) => m.Key.NameT);
-            //         break;
-            // }
-            // foreach (KeyValuePair<MatType, int> mat in orderedEnumerable)
-            // {
-            //     UDB uDB = blocks.Get(mat.Key, null);
-            //     if (uDB == null)
-            //     {
-            //         uDB = UDB.Create(this, UDBT.ITextBtn, mat.Key.IconId, mat.Key.NameT).WithIconTint(mat.Key.IconTint).WithTooltipFunction((UDB b) => mat.Key.Def.ExtendedTooltip(S))
-            //             .WithIconClickFunction(The.Defs.Get(mat.Key.DefId).ShowManualEntry);
-            //         blocks[mat.Key] = uDB;
-            //     }
-            //     uDB.WithText(Units.Num(mat.Value));
-            //     uDB.WithText2(T.Find);
-            //     uDB.WithIconHoverFunction(delegate (bool s)
-            //     {
-            //         if (s)
-            //         {
-            //             chartMat = mat.Key;
-            //             chartUDB.UpdateTitle(mat.Key.NameT);
-            //         }
-            //     });
-            //     uDB.WithClickFunction(delegate
-            //     {
-            //         if (mat.Value == 0)
-            //         {
-            //             UISounds.PlayActionDenied();
-            //         }
-            //         else
-            //         {
-            //             IMatStorage matStorage = FindNextMat(mat.Key);
-            //             if (matStorage != null)
-            //             {
-            //                 EntityUtils.CameraFocusOn(matStorage.Entity);
-            //                 S.Sig.SelectEntity.Send(matStorage.Entity);
-            //             }
-            //         }
-            //     });
-            //     res.Add(uDB);
-            // }
-            // CreateChart(res);
+        private void CreateChart(List<UDB> res)
+        {
+            res.Add(chartUDB ?? (chartUDB = UDB.Create(this, UDBT.DChart, null).WithChartFunction(delegate (UDB b, RTChart chart)
+            {
+                if (chartMat != null)
+                {
+                    SortedDictionary<long, int> history = chartMat.History;
+                    if (history == null || history.Count >= 2)
+                    {
+                        SortedDictionary<long, int> history2 = chartMat.History;
+                        List<RTChartNode> list = new List<RTChartNode>();
+                        KeyValuePair<long, int> keyValuePair = history2.First();
+                        long key = keyValuePair.Key;
+                        int num = keyValuePair.Value;
+                        KeyValuePair<long, int> keyValuePair2 = history2.Last();
+                        long num2 = S.Ticks - 30240;
+                        if (num2 < 0)
+                        {
+                            num2 = 0L;
+                        }
+                        foreach (KeyValuePair<long, int> item in history2)
+                        {
+                            if (item.Key >= num2)
+                            {
+                                int value = item.Value;
+                                list.Add(new RTChartNode
+                                {
+                                    Type = RTChartNode.NodeType.Line,
+                                    From = new Vector2(key, num),
+                                    To = new Vector2(item.Key, value),
+                                    Color = Color.green,
+                                    Thickness = 3f
+                                });
+                                key = item.Key;
+                                num = value;
+                            }
+                        }
+                        list.Add(new RTChartNode
+                        {
+                            Type = RTChartNode.NodeType.Line,
+                            From = new Vector2(keyValuePair.Key, 0f),
+                            To = new Vector2(keyValuePair2.Key, 0f),
+                            Color = Color.red,
+                            SkipTooltip = true,
+                            Thickness = 3f
+                        });
+                        chart.TooltipFunc = delegate (Vector2 xy, Vector2 xyVal, float minX, float minY, float maxX, float maxY, List<RTChartNode> nodes)
+                        {
+                            if (nodes.Count != 1)
+                            {
+                                return null;
+                            }
+                            string arg = Units.TicksAgo(Mathf.FloorToInt(maxX - xyVal.x));
+                            float f = nodes[0].ValueAt(xy.x);
+                            f = Mathf.RoundToInt(f);
+                            return $"{f}<br>{arg}";
+                        };
+                        chart.Render(list, hasTitle: true);
+                        return;
+                    }
+                }
+                chart.Render(null, hasTitle: false);
+            }).Attached()));
         }
     }
+
+
 }
