@@ -8,6 +8,7 @@ using Game.Systems;
 using KL.Utils;
 using UnityEngine;
 using Game.Utils;
+using InventoryUIPlus.Data;
 
 namespace SearchableInventory
 {
@@ -51,6 +52,8 @@ namespace SearchableInventory
             overlays.Add(overlayInfo);
             ui = new SearchableInventoryUI(this);
 
+            D.Warn($"Custom materials data is {(Materials.Instance.IsMaterialsLoaded ? "" : "not")} loaded");
+
             S.Sig.AfterLoadState.AddListener(OnLoadSave);
             S.Sig.AreasInitialized.AddListener(OnAreasInit);
             S.Sig.ToggleOverlay.AddListener(OnToggleOverlay);
@@ -76,9 +79,6 @@ namespace SearchableInventory
         private void OnLoadSave(GameState state)
         {
             this.state = state;
-            // S.Clock.OnTick.AddListener(OnTick);
-            // UIPopupWidget.Spawn(IconId.CWarning, "warning".T(),
-            //     "Note for mod developer. ExampleModSys should be removed from your mod");
         }
 
         // If your system depends on AreasSys, for example, you may want to
@@ -87,13 +87,6 @@ namespace SearchableInventory
         {
             D.Warn("Areas initialized");
         }
-
-        // OnTickAsync should be preferred over this
-        // private void OnTick(long ticks)
-        // {
-        //     D.Warn("Ticking synchronously. Tick: {0}", ticks);
-        //     D.Err("PLEASE REMOVE Clock.OnTick LISTENER IF YOU DON'T NEED IT IN YOUR MOD");
-        // }
 
         public override void Unload()
         {

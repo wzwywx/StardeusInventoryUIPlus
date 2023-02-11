@@ -11,6 +11,7 @@ using System.Linq;
 using Game.Components;
 using Game;
 using Game.Rendering;
+using InventoryUIPlus;
 using UnityEngine;
 
 namespace SearchableInventory
@@ -106,45 +107,8 @@ namespace SearchableInventory
             }
         }
 
-        private static bool isEquipmentLoaded = false;
-
-        private static readonly Dictionary<string, TempDef> AllEquipment = new Dictionary<string, TempDef>();
-
-        struct TempDef
-        {
-            public string Id;
-            public string DefId;
-            public bool IsExperimental;
-
-        }
-
-        // TODO: Just realized that I don't need this
-        private static void LoadKnownEquipment()
-        {
-            if (isEquipmentLoaded)
-            {
-                return;
-            }
-            isEquipmentLoaded = true;
-            string configParent = "Config/Equipment";
-            foreach (TempDef item in The.ModLoader.LoadObjects<TempDef>(configParent))
-            {
-                if (item.IsExperimental && !A.IsExperimentalOn)
-                {
-                    continue;
-                }
-                if (AllEquipment.ContainsKey(item.Id))
-                {
-                    string text = "Trying to load Equipment with Id that already exists: " + item.Id;
-                    D.Err(text);
-                    UIPopupWidget.Spawn("Icons/Color/Warning", "GAME BREAKING BUG", text);
-                    continue;
-                }
-                AllEquipment.Add(item.DefId, item);
-            }
-
-        }
         // need to change this to return a category
+        // TODO: I should cache the categories
         private void Categorize(MatType mat, out string compType)
         {
             Def def = The.Defs.TryGet(mat.DefId);
@@ -174,22 +138,9 @@ namespace SearchableInventory
                 }
             }
 
-            // // check equipment
-            // LoadKnownEquipment();
-            // // D.Warn("{0}", AllEquipment.Count);
-            // // foreach (var eq in AllEquipment)
-            // // {
-            // //     D.Warn(mat.DefId);
-            // //     D.Warn(eq.Key);
-            // //     D.Warn("---");
-            // // }
-            // if (AllEquipment.ContainsKey(mat.DefId))
-            // {
-            //     D.Warn("{0} is an equipment", mat.DefId);
-            // }
-
             compType = mat.Group;
 
+            // prioritize categorizing with mat.Group before everything else
             if (mat.Group is not null)
             {
                 return;
@@ -198,14 +149,19 @@ namespace SearchableInventory
             if (Craftable.IsCraftable(def.Id))
             {
                 // TODO: make this a local string later
-                compType = "Crafting/Building";
+                compType = "Craftable";
                 return;
             }
+
+            D.Warn(mat.DefId);
+            // TODO: put this in the same namespace to avoid namespace collision
+            // Or just initialize an instance of materials
+            D.Warn(InventoryUIPlus.Data.Materials.Instance.GetCategory(mat.DefId));
 
             // if fail to categorize at the end, give the "Unknown" category to material
             if (mat.Group is null)
             {
-                compType = "Unknown";
+                compType = InventoryUIPlus.Data.Materials.Instance.GetCategory(mat.DefId);
                 return;
             }
         }
@@ -214,7 +170,7 @@ namespace SearchableInventory
         public void GetUIDetails(List<UDB> res)
         {
             S.Sys.Inventory.LoadRemainingMaterials(availableCache);
-            res.Add(header ?? (header = UDB.Create(this, UDBT.DTextRBHeader, IconId.WMaterials, "searchableinventory.ui.header").AsHeader().WithRBFunction(S.Sig.HideOverlay.Send)));
+            res.Add(header ?? (header = UDB.Create(this, UDBT.DTextRBHeader, IconId.WMaterials, "inventoryuiplus.ui.header").AsHeader().WithRBFunction(S.Sig.HideOverlay.Send)));
 
             S.Sys.Codex.EnhanceOverlay("Resources", res);
 
@@ -255,13 +211,20 @@ namespace SearchableInventory
 
             }
 
-            String category = "None";
+            string prevCategory = "";
+            string currentCategory;
             foreach (KeyValuePair<MatType, int> mat in orderedEnumerable)
             {
                 var def = The.Defs.TryGet(mat.Key.DefId);
-                Categorize(mat.Key, out category);
+                if (sortMode == SortMode.Category)
+                {
+                    Categorize(mat.Key, out currentCategory);
 
-                res.Add(UDB.Create(this, UDBT.DLabel, "Icons/Color/Warning", $"{category}"));
+                    if (prevCategory == "" || prevCategory != currentCategory)
+                        res.Add(UDB.Create(this, UDBT.DLabel, "Icons/Color/Warning", $"{currentCategory}"));
+                    prevCategory = currentCategory;
+                }
+
 
                 UDB uDB = blocks.GetValueOrDefault(mat.Key, null);
 
