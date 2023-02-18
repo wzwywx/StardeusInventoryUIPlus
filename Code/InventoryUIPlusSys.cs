@@ -5,6 +5,10 @@ using Game.Systems;
 using KL.Utils;
 using UnityEngine;
 using InventoryUIPlus.Data;
+using Game;
+using Game.Constants;
+using System.Text.RegularExpressions;
+using System.Linq;
 
 namespace InventoryUIPlus
 {
@@ -28,19 +32,15 @@ namespace InventoryUIPlus
 
         private GameState state;
 
-        // By returning something in the Overlays list, your system can add
-        // buttons in the top right section of the game UI.
-        // Those buttons will toggle the overlays.
-        // Almost always there will be just one OverlayInfo in the list,
-        // The only exceptions right now are:
-        // - EquilibriumSys (Oxygen, Heat, Airtightness and Insulation)
-        // - HiveMindSys (Beings, Tasks)
         public List<OverlayInfo> Overlays => overlays;
         private readonly List<OverlayInfo> overlays = new();
 
         private InventoryUIPlusUI ui;
-        // Public so that the UI can use it
+
+        // public so that the UI can use it
         public int SomeVariable;
+
+        private readonly Dictionary<MatType, int> availableCache = new Dictionary<MatType, int>();
 
         protected override void OnInitialize()
         {
@@ -54,7 +54,6 @@ namespace InventoryUIPlus
             S.Sig.AreasInitialized.AddListener(OnAreasInit);
             S.Sig.ToggleOverlay.AddListener(OnToggleOverlay);
         }
-
         // You will have to create Graphics/Icons/White/ExampleModIcon.png
         private readonly OverlayInfo overlayInfo = new OverlayInfo(9999, SysId,
             "Icons/White/MaterialsPlus");
@@ -82,6 +81,8 @@ namespace InventoryUIPlus
         private void OnAreasInit()
         {
             D.Warn("Areas initialized");
+            InitializeCache();
+
         }
 
         public override void Unload()
@@ -109,6 +110,100 @@ namespace InventoryUIPlus
         {
             this.data = data;
             SomeVariable = data.GetInt("SomeVariable", 0);
+        }
+
+        public readonly Dictionary<string, MiniDef> PlusCache = new();
+
+        private void InitializeCache()
+        {
+            D.Warn("InitializeCache");
+
+            // Dictionary<string, MiniDef> cache = new();
+            S.Sys.Inventory.LoadRemainingMaterials(availableCache);
+
+
+            foreach (KeyValuePair<MatType, int> mat in availableCache)
+            {
+                var def = The.Defs.TryGet(mat.Key.DefId);
+                var quantity = mat.Value;
+                var category = Categorize(mat.Key);
+
+                MiniDef miniDef = new MiniDef();
+                // TODO: Make a constructor later
+                miniDef.DefId = mat.Key.DefId;
+                // miniDef.Quantity = quantity;
+                miniDef.Category = category;
+
+                D.Warn(miniDef.Quantity.ToString());
+
+                PlusCache.Add(mat.Key.DefId, miniDef);
+
+                // TODO: Bookmark
+            }
+
+        }
+
+        private string Categorize(MatType mat)
+        {
+            Def def = The.Defs.TryGet(mat.DefId);
+            string compType;
+
+            // check processable
+            if (def.HasComponent(T.Processable))
+            {
+                foreach (ComponentConfig component in def.Components)
+                {
+                    if (component.ToString() == "CompCfg[Processable]")
+                    {
+                        var properties = component.Properties;
+                        if (properties is null)
+                        {
+                            D.Warn("No properties");
+                            continue;
+                        }
+                        foreach (var p in properties)
+                        {
+                            if (p.Key == "Type")
+                            {
+                                compType = p.String;
+                                return compType;
+                            }
+                        }
+                    }
+                }
+            }
+
+            compType = mat.Group;
+
+            // prioritize categorizing with mat.Group before everything else
+            if (mat.Group is not null)
+            {
+                compType = Regex.Replace(compType, "([A-Z])", " $1").Trim();
+                return compType;
+            }
+
+            if (Craftable.IsCraftable(def.Id))
+            {
+                // TODO: make this a local string later
+                compType = "Craftable";
+                return compType;
+            }
+
+            // TODO: put this in the same namespace to avoid namespace collision
+            // Or just initialize an instance of materials
+
+            // if fail to categorize at the end, give the "Unknown" category to material
+
+            // if group is not available, return custom category
+            if (mat.Group is null)
+            {
+                var pascalCategory = InventoryUIPlus.Data.Materials.Instance.GetCategory(mat.DefId);
+                compType = Regex.Replace(pascalCategory, "([A-Z])", " $1").Trim();
+                return compType;
+            }
+
+            // if all else fails, return Undefined
+            return "Undefined";
         }
     }
 }

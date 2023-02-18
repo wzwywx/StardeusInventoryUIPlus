@@ -13,12 +13,12 @@ namespace InventoryUIPlus.Data
         public string IconId;
 
         public string Category;
+        public int Quantity;
         public bool IsExperimental;
 
     }
     public sealed class Materials
     {
-
         // singleton pattern
         private static Materials _instance;
 
@@ -95,10 +95,6 @@ namespace InventoryUIPlus.Data
             }
 
             _isMaterialsLoaded = true;
-
-
-
-
         }
 
         public string GetCategory(string defId)

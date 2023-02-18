@@ -10,6 +10,7 @@ using Game;
 using Game.Rendering;
 using UnityEngine;
 using System.Text.RegularExpressions;
+using InventoryUIPlus.Data;
 
 namespace InventoryUIPlus
 {
@@ -17,8 +18,8 @@ namespace InventoryUIPlus
     {
         private readonly InventoryUIPlusSys sys;
         private readonly GameState S;
-
         private readonly HashSet<string> foo = new();
+        public Entity Entity => null;
 
         public InventoryUIPlusUI(InventoryUIPlusSys sys)
         {
@@ -27,8 +28,7 @@ namespace InventoryUIPlus
         }
 
         // This doesn't belong to an entity, so let's return a null
-        public Entity Entity => null;
-        private UDB header;
+
 
         private void DoSomething()
         {
@@ -65,6 +65,8 @@ namespace InventoryUIPlus
 
         private readonly List<IMatStorage> materialStorages = new List<IMatStorage>();
         private readonly Dictionary<MatType, int> availableCache = new Dictionary<MatType, int>();
+
+        // SORT
         void ToggleSort()
         {
             sortMode = Enums.Cycle(sortMode);
@@ -98,8 +100,10 @@ namespace InventoryUIPlus
             }
         }
 
-        // need to change this to return a category
+        // CATEGORIZATION
+
         // TODO: I should cache the categories to avoid calling Categorize() in two places but access the category cache instead
+        // TODO: I should put this into the Sys portion and not the UI
         private void Categorize(MatType mat, out string compType)
         {
             Def def = The.Defs.TryGet(mat.DefId);
@@ -157,6 +161,7 @@ namespace InventoryUIPlus
             }
         }
         private UDB sortModeBlock;
+        private UDB header;
 
         public void GetUIDetails(List<UDB> res)
         {
@@ -193,10 +198,7 @@ namespace InventoryUIPlus
                 case SortMode.Category:
                     orderedEnumerable = availableCache.OrderBy((KeyValuePair<MatType, int> m) =>
                     {
-                        Def def = The.Defs.TryGet(m.Key.DefId);
-                        string category;
-                        Categorize(m.Key, out category);
-                        return category;
+                        return GetCategoryFromCache(m.Key.DefId);
                     });
                     break;
 
@@ -214,7 +216,7 @@ namespace InventoryUIPlus
                 var def = The.Defs.TryGet(mat.Key.DefId);
                 if (sortMode == SortMode.Category)
                 {
-                    Categorize(mat.Key, out currentCategory);
+                    currentCategory = GetCategoryFromCache(mat.Key.DefId);
 
                     if (prevCategory == "" || prevCategory != currentCategory)
                         res.Add(UDB.Create(this, UDBT.DLabel, "Icons/Color/Warning", $"{currentCategory}"));
@@ -259,6 +261,23 @@ namespace InventoryUIPlus
                 res.Add(uDB);
             }
             CreateChart(res);
+        }
+
+        private string GetCategoryFromCache(string defId)
+        {
+            string currentCategory;
+            MiniDef tempDef;
+
+            if (sys.PlusCache.TryGetValue(defId, out tempDef))
+            {
+                currentCategory = tempDef.Category;
+            }
+            else
+            {
+                currentCategory = "Missing Category";
+            }
+
+            return currentCategory;
         }
 
         private UDB chartUDB;
