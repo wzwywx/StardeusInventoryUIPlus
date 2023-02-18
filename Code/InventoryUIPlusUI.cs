@@ -1,29 +1,26 @@
 using System.Collections.Generic;
-using System;
-using Game.Systems;
 using Game.Constants;
 using Game.Data;
 using Game.UI;
 using Game.Utils;
 using KL.Utils;
-using KL.Collections;
 using System.Linq;
 using Game.Components;
 using Game;
 using Game.Rendering;
-using InventoryUIPlus;
 using UnityEngine;
+using System.Text.RegularExpressions;
 
-namespace SearchableInventory
+namespace InventoryUIPlus
 {
-    public sealed class SearchableInventoryUI : IUIDataProvider
+    public sealed class InventoryUIPlusUI : IUIDataProvider
     {
-        private readonly SearchableInventorySys sys;
+        private readonly InventoryUIPlusSys sys;
         private readonly GameState S;
 
         private readonly HashSet<string> foo = new();
 
-        public SearchableInventoryUI(SearchableInventorySys sys)
+        public InventoryUIPlusUI(InventoryUIPlusSys sys)
         {
             this.sys = sys;
             S = sys.S;
@@ -38,12 +35,6 @@ namespace SearchableInventory
             // For this example, let's increment the number and rebuild the UI
             sys.SomeVariable++;
             header.NeedsListRebuild = true;
-        }
-
-        private void OnButtonClick()
-        {
-            UIPopupWidget.Spawn(IconId.CWarning, "some.popup".T(),
-                "Popups should be used extremely sparingly, since nobody reads this. Also, if you put the text in like this, it will be impossible to translate, use \"some.text\".T() instead.");
         }
 
         private void HideOverlay()
@@ -108,7 +99,7 @@ namespace SearchableInventory
         }
 
         // need to change this to return a category
-        // TODO: I should cache the categories
+        // TODO: I should cache the categories to avoid calling Categorize() in two places but access the category cache instead
         private void Categorize(MatType mat, out string compType)
         {
             Def def = The.Defs.TryGet(mat.DefId);
@@ -143,6 +134,7 @@ namespace SearchableInventory
             // prioritize categorizing with mat.Group before everything else
             if (mat.Group is not null)
             {
+                compType = Regex.Replace(compType, "([A-Z])", " $1").Trim();
                 return;
             }
 
@@ -153,15 +145,14 @@ namespace SearchableInventory
                 return;
             }
 
-            D.Warn(mat.DefId);
             // TODO: put this in the same namespace to avoid namespace collision
             // Or just initialize an instance of materials
-            D.Warn(InventoryUIPlus.Data.Materials.Instance.GetCategory(mat.DefId));
 
             // if fail to categorize at the end, give the "Unknown" category to material
             if (mat.Group is null)
             {
-                compType = InventoryUIPlus.Data.Materials.Instance.GetCategory(mat.DefId);
+                var pascalCategory = InventoryUIPlus.Data.Materials.Instance.GetCategory(mat.DefId);
+                compType = Regex.Replace(pascalCategory, "([A-Z])", " $1").Trim();
                 return;
             }
         }
@@ -170,7 +161,7 @@ namespace SearchableInventory
         public void GetUIDetails(List<UDB> res)
         {
             S.Sys.Inventory.LoadRemainingMaterials(availableCache);
-            res.Add(header ?? (header = UDB.Create(this, UDBT.DTextRBHeader, IconId.WMaterials, "inventoryuiplus.ui.header").AsHeader().WithRBFunction(S.Sig.HideOverlay.Send)));
+            res.Add(header ?? (header = UDB.Create(this, UDBT.DTextRBHeader, "Icons/White/MaterialsPlus", "inventoryuiplus.ui.header".T()).AsHeader().WithRBFunction(S.Sig.HideOverlay.Send)));
 
             S.Sys.Codex.EnhanceOverlay("Resources", res);
 
@@ -215,6 +206,11 @@ namespace SearchableInventory
             string currentCategory;
             foreach (KeyValuePair<MatType, int> mat in orderedEnumerable)
             {
+                // skip 0 quantity items
+                if (mat.Value == 0)
+                {
+                    continue;
+                }
                 var def = The.Defs.TryGet(mat.Key.DefId);
                 if (sortMode == SortMode.Category)
                 {

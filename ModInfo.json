@@ -1,10 +1,10 @@
 {
-    "Id": "Searchable Inventory",
+    "Id": "InventoryUI+",
     "SteamWorkshop": true,
-    "Name": "Searchable Inventory",
-    "Description": "For troubleshooting",
-    "ModVersion": "1.0.0",
-    "GameVersion": "0.7.2.1490",
+    "Name": "InventoryUI+",
+    "Description": "Expands the Inventory UI with additional features (that's the plan at least).\n\nTo not mess up the existing keyboard shortcuts and muscle memory, I decided to leave the original inventory UI alone and instead add an overlay button for the mod. The button should be near the end of the button rows and before the Codex button (question mark).\n\nFeatures:\n1. Sort by category (it categorizes based on info available in Vanilla which can make little sense at times). Any suggestions on better categorizations is much appreciated.\n2. Remove items with 0 quantity from the list.\n\nI'm still working on optimizing the mod and figuring out other QoL stuff I can add.",
+    "ModVersion": "0.2.3",
+    "GameVersion": "0.7.9.1509",
     "Dependencies": [
         "Core"
     ]

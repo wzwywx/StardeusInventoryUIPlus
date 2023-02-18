@@ -1,21 +1,17 @@
 using System.Collections.Generic;
-// using ExampleMod.UI;
 using Game.Components;
-using Game.Constants;
 using Game.Data;
-using Game.UI;
 using Game.Systems;
 using KL.Utils;
 using UnityEngine;
-using Game.Utils;
 using InventoryUIPlus.Data;
 
-namespace SearchableInventory
+namespace InventoryUIPlus
 {
-    public sealed class SearchableInventorySys : GameSystem, IOverlayProvider, ISaveable
+    public sealed class InventoryUIPlusSys : GameSystem, IOverlayProvider, ISaveable
     {
         // The convention is that all systems end with Sys, and SysId is equal to the class name
-        public const string SysId = "SearchableInventory";
+        public const string SysId = "InventoryUIPlusSys";
         public override string Id => SysId;
         // If your system can work in sandbox too, set this to false
         public override bool SkipInSandbox => true;
@@ -23,7 +19,7 @@ namespace SearchableInventory
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void Register()
         {
-            GameSystems.Register(SysId, () => new SearchableInventorySys());
+            GameSystems.Register(SysId, () => new InventoryUIPlusSys());
         }
 
         // If your system adds some mechanic that may not be compatible with
@@ -42,7 +38,7 @@ namespace SearchableInventory
         public List<OverlayInfo> Overlays => overlays;
         private readonly List<OverlayInfo> overlays = new();
 
-        private SearchableInventoryUI ui;
+        private InventoryUIPlusUI ui;
         // Public so that the UI can use it
         public int SomeVariable;
 
@@ -50,7 +46,7 @@ namespace SearchableInventory
         {
             overlays.Clear();
             overlays.Add(overlayInfo);
-            ui = new SearchableInventoryUI(this);
+            ui = new InventoryUIPlusUI(this);
 
             D.Warn($"Custom materials data is {(Materials.Instance.IsMaterialsLoaded ? "" : "not")} loaded");
 
@@ -60,8 +56,8 @@ namespace SearchableInventory
         }
 
         // You will have to create Graphics/Icons/White/ExampleModIcon.png
-        private readonly OverlayInfo overlayInfo = new OverlayInfo(-110, SysId,
-            "Icons/White/Materials");
+        private readonly OverlayInfo overlayInfo = new OverlayInfo(9999, SysId,
+            "Icons/White/MaterialsPlus");
 
         private void OnToggleOverlay(OverlayInfo info, bool on)
         {
